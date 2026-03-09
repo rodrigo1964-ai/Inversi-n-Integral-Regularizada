@@ -1,0 +1,11 @@
+
+Figure X compares the classical recursion method and the proposed HAM regressor
+for the 2nd-order system of [rodrigo2015]. For N ≤ 30,
+both methods produce identical trajectories (relative error < 10^{-6}),
+confirming the correctness of the HAM formulation. However, the classical method
+becomes numerically unstable at N ≈ 40, where the matrix
+M_{12} becomes singular due to accumulated floating-point errors. In contrast,
+the HAM regressor continues to produce accurate solutions up to N = 10,
+demonstrating complete elimination of the singularity problem. Table I shows
+that the HAM error remains bounded (< 10^{-5}) across all horizons, while
+classical error grows exponentially beyond N_{crit}.

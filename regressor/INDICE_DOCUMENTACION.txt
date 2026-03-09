@@ -1,0 +1,194 @@
+================================================================================
+                    ÍNDICE DE DOCUMENTACIÓN
+            Comparación Regresor Homotópico vs RK4
+================================================================================
+
+Autor: Rodolfo H. Rodrigo - UNSJ
+Fecha: 27 de Febrero de 2026
+Versión: FINAL
+
+================================================================================
+DOCUMENTOS PRINCIPALES
+================================================================================
+
+📄 REPORTE_FINAL.md
+   • Reporte técnico completo (10 secciones)
+   • Incluye metodología, resultados de ambas fases, análisis de convergencia
+   • Conclusiones integradas y recomendaciones prácticas
+   • 📊 DOCUMENTO PRINCIPAL - LEER PRIMERO
+
+📄 RESUMEN_FINAL.txt
+   • Resumen ejecutivo en texto plano
+   • Hallazgos principales y tabla de resultados
+   • Recomendaciones prácticas
+   • ⚡ LECTURA RÁPIDA (5 minutos)
+
+================================================================================
+SCRIPTS DE PRUEBAS
+================================================================================
+
+🐍 test_regressor_vs_rk4.py
+   • Script de comparación inicial (Fase 1)
+   • 8 tests: ecuaciones de 1er y 2do orden
+   • Paso temporal estándar
+   • Genera gráficos (si matplotlib disponible)
+
+🐍 test_step_size_effect.py
+   • Análisis del efecto del paso temporal (Fase 2)
+   • Demuestra mejora dramática con T reducido
+   • Estima orden de convergencia (p ≈ 0.91)
+   • Tests con Duffing y Van der Pol
+
+🐍 export_results_csv.py
+   • Exporta todos los resultados a CSV
+   • Genera archivos individuales por test
+   • Crea resumen consolidado
+
+================================================================================
+DATOS EXPORTADOS (CSV)
+================================================================================
+
+📊 resumen_comparacion.csv
+   • Tabla resumen de los 8 tests
+   • Columnas: Test, Error_Maximo, Error_RMS, N_Puntos
+
+📊 test1_lineal_1er_orden.csv
+📊 test2_cuadratica.csv
+📊 test3_trigonometrica.csv
+📊 test4_cubica.csv
+📊 test5_oscilador_armonico.csv
+📊 test6_pendulo_amortiguado.csv
+📊 test7_duffing.csv
+📊 test8_van_der_pol.csv
+   • Datos completos: tiempo, y_rk4, y_regresor, error_absoluto
+   • Listos para importar en Excel, MATLAB, Python, etc.
+
+================================================================================
+DOCUMENTOS HISTÓRICOS (Fase 1)
+================================================================================
+
+📄 REPORTE_REGRESSOR_VS_RK4.md
+   • Reporte inicial (antes del análisis de paso temporal)
+   • Conclusiones preliminares
+
+📄 RESUMEN_EJECUTIVO_RK4.txt
+   • Resumen ejecutivo inicial
+
+📄 README_BENCHMARK.md
+   • Documentación previa de benchmarks
+
+📄 REPORTE_BENCHMARK.md
+   • Reporte de benchmarks 3pt vs 4pt
+
+================================================================================
+CÓDIGO FUENTE DEL REGRESOR
+================================================================================
+
+🔧 regressor.py
+   • Generador simbólico del regresor (SymPy)
+   • build_regressor_order1() - Ecuaciones de 1er orden
+   • build_regressor_order2() - Ecuaciones de 2do orden
+
+🔧 solver.py
+   • Implementación numérica del regresor
+   • solve_order1() - Ecuaciones de 1er orden
+   • solve_order2() - Ecuaciones de 2do orden
+   • solve_order1_numeric() - Con derivadas numéricas
+
+🔧 ode_solver.py
+   • Solver genérico con 3 o 4 puntos
+   • Construcción simbólica de regressors
+
+🔧 derivatives.py
+   • Cálculo de derivadas
+
+🔧 parser.py
+   • Parser de ecuaciones
+
+================================================================================
+EJEMPLOS Y BENCHMARKS
+================================================================================
+
+📝 examples.py
+   • Ejemplos de uso del regresor
+   • 8 casos: lineales, no lineales, fricción, etc.
+
+📊 benchmark_3pt_vs_4pt.py
+📊 benchmark_comparison.py
+📊 benchmark_full.py
+📊 tabla_iteracion.py
+   • Scripts de benchmarking previos
+
+================================================================================
+CÓMO USAR ESTA DOCUMENTACIÓN
+================================================================================
+
+1. LECTURA RÁPIDA (10 minutos):
+   → Leer: RESUMEN_FINAL.txt
+   → Ver: resumen_comparacion.csv
+
+2. LECTURA COMPLETA (45 minutos):
+   → Leer: REPORTE_FINAL.md
+   → Ejecutar: test_regressor_vs_rk4.py
+   → Ejecutar: test_step_size_effect.py
+
+3. PARA IMPLEMENTAR EL MÉTODO:
+   → Estudiar: solver.py (implementación numérica)
+   → Ver ejemplos en: examples.py
+   → Adaptar para tu aplicación
+
+4. PARA ANÁLISIS DE DATOS:
+   → Importar: archivos CSV en tu herramienta favorita
+   → Graficar y analizar según necesidad
+
+================================================================================
+HALLAZGOS PRINCIPALES (RESUMEN)
+================================================================================
+
+✅ El regresor homotópico es COMPETITIVO con RK4 para TODOS los sistemas
+   cuando se usa el paso temporal apropiado.
+
+✅ Errores alcanzados:
+   • Sistemas lineales:          10⁻⁴
+   • Sistemas no lineales mod.:  10⁻²
+   • Sistemas muy no lineales:   10⁻¹ (con paso reducido)
+
+✅ Orden de convergencia: p ≈ 0.91
+   Reducir T a la mitad → Error mejora ~1.9×
+
+✅ Muy eficiente: 2-235 ms para 500-20,000 puntos
+
+✅ Ideal para sistemas embebidos, control en tiempo real
+
+================================================================================
+RECOMENDACIONES DE PASO TEMPORAL
+================================================================================
+
+Sistema                    | N Puntos Recomendado | Paso T
+──────────────────────────────────────────────────────────────────
+Lineal                     | 500-1,000            | 0.01-0.02
+No lineal moderado         | 1,000-2,000          | 0.005-0.01
+Muy no lineal              | 10,000-20,000        | 0.001-0.003
+Caótico / Muy sensible     | ≥20,000              | <0.001
+
+================================================================================
+PRÓXIMOS PASOS SUGERIDOS
+================================================================================
+
+1. Implementar control adaptativo del paso T
+2. Portar a microcontrolador (ARM, ESP32)
+3. Comparar con métodos adaptativos (RK45)
+4. Extender a sistemas MIMO
+5. Implementar versión de 4-5 puntos
+
+================================================================================
+CONTACTO
+================================================================================
+
+Para preguntas o colaboraciones:
+Rodolfo H. Rodrigo
+Universidad Nacional de San Juan (UNSJ)
+
+================================================================================
+FIN DEL ÍNDICE
+================================================================================

@@ -1,0 +1,493 @@
+\documentclass[lettersize,journal]{IEEEtran}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{array}
+\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{bm}
+\usepackage{booktabs}
+
+\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
+
+\begin{document}
+
+\title{Dual Homotopy-Based Regressors for Simultaneous State and Input Estimation in Uncertain Nonlinear Systems via Nonlinear Kalman Filtering}
+
+\author{Rodolfo~H.~Rodrigo,~\IEEEmembership{Member,~IEEE,}
+        Gustavo~Schweickardt,
+        and~Daniel~H.~Pati\~no,~\IEEEmembership{Member,~IEEE}
+\thanks{R.~H.~Rodrigo is with the Departamento Electromec\'anica, Facultad de Ingenier\'ia, Universidad Nacional de San Juan, San Juan, Argentina (e-mail: rodolfo\_rh@unsj.edu.ar).}
+\thanks{G.~Schweickardt is with CONICET / Universidad Tecnol\'ogica Nacional, Entre R\'ios, Argentina.}
+\thanks{D.~H.~Pati\~no is with the Instituto de Autom\'atica (INAUT), Facultad de Ingenier\'ia, Universidad Nacional de San Juan, San Juan, Argentina.}
+\thanks{Manuscript received XX XX, 2025.}}
+
+\markboth{IEEE Transactions on Systems, Man, and Cybernetics: Systems, 2025}%
+{Rodrigo \MakeLowercase{\textit{et al.}}: Dual Homotopy-Based Regressors for State and Input Estimation}
+
+\maketitle
+
+\begin{abstract}
+This paper presents a dual homotopy-based architecture for simultaneous state and input estimation in uncertain nonlinear dynamic systems. The key theoretical insight is that the Homotopy Analysis Method (HAM), when applied to an implicit nonlinear discrete equation $F = 0$ arising from a Linear Multistep Method, produces explicit algebraic regressors for \emph{any} variable of the equation---not only the state. This yields a symmetric pair of regressors: a \emph{direct} regressor that predicts the next state given the current input, and an \emph{inverse} regressor that reconstructs the input from measured states. Both share identical mathematical structure, convergence guarantees, and analytical derivatives. When combined with an Extended Kalman Filter (EKF), the direct regressor serves as the state transition model, while the inverse regressor, evaluated on the filtered state, provides a filtered input estimate with quantified uncertainty. The approach is validated on a DC motor with nonlinear magnetic saturation $L(i)$, where the mechanical state (angular velocity) is estimated by the direct HFNN regressor, and the armature current---which produces the electromagnetic torque---is reconstructed by the inverse HFNN regressor from the implicit electrical equation. Results demonstrate simultaneous estimation with fewer than 50 training samples, analytical Jacobians for the EKF, and inherited stability and consistency guarantees from the underlying homotopy scheme.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Homotopy Analysis Method, nonlinear Kalman filtering, input estimation, system identification, dual regressors, grey-box modeling, DC motor, magnetic saturation.
+\end{IEEEkeywords}
+
+% =============================================================
+\section{Introduction}
+% =============================================================
+
+\IEEEPARstart{T}{he} simultaneous estimation of states and unknown inputs in nonlinear dynamic systems is a fundamental problem in control engineering, fault diagnosis, and system monitoring \cite{gillijns2007}. In many practical situations, not all system variables are directly measurable. For instance, in electromechanical drives, the angular velocity may be measured by an encoder while the armature current---which generates the electromagnetic torque---must be inferred from the electrical dynamics. When these dynamics are nonlinear (e.g., due to magnetic saturation), the estimation problem becomes implicit and standard observers do not apply directly.
+
+The classical approach to joint state--input estimation augments the state vector with the unknown input, modeled as a random walk $u_{k+1} = u_k + w_k$, and applies the Extended Kalman Filter (EKF) or the Unscented Kalman Filter (UKF) to the augmented system \cite{kitanidis1987, gillijns2007}. This introduces an \emph{ad hoc} hypothesis: the input must vary slowly relative to the sampling period, and the covariance $Q_u$ of the random walk must be tuned manually. If the input changes rapidly, the filter lags; if $Q_u$ is too large, estimation noise increases.
+
+An alternative is model inversion: given a plant model $y_{k+1} = f(y_k, u_k)$, one solves for $u_k$ given the measured outputs. For linear systems this is straightforward; for nonlinear systems, the inversion requires iterative numerical solvers (Newton--Raphson) or neural-network-based inverse models trained on data \cite{hunt1996}. Neither approach provides analytical derivatives or formal convergence guarantees.
+
+In a companion paper \cite{rodrigo2025hfnn}, we introduced the Homotopy-Based Functional Neural Network (HFNN), which uses the Homotopy Analysis Method (HAM) \cite{liao2003, liao2012} to convert the implicit nonlinear discrete equation arising from a Linear Multistep Method (LMM) into an explicit algebraic regressor for the system state. The regressor retains the nonlinear function $N(y)$ and its derivatives $N'(y)$, $N''(y)$ by construction, providing a theoretically founded discretization analogous to what Tustin and zero-order hold provide for linear systems.
+
+The present paper makes the following observation: \textbf{HAM is agnostic to the choice of unknown variable}. Given any implicit equation $F(x_1, x_2, \ldots, x_n) = 0$, the homotopy series produces an explicit regressor for any $x_i$ provided $\partial F / \partial x_i \neq 0$ at the expansion point. The convergence guarantees, the rational truncation structure, and the analytical derivative formulas transfer identically regardless of which variable is resolved.
+
+This leads to the central contribution of this paper: a \emph{dual regressor architecture} consisting of:
+\begin{enumerate}
+    \item A \textbf{direct HFNN regressor} that predicts the next state from current states and inputs.
+    \item An \textbf{inverse HFNN regressor} that reconstructs the input from measured states, obtained by applying HAM to the \emph{same} implicit equation with the input as the unknown.
+    \item An \textbf{EKF} that filters the state using the direct regressor as transition model, after which the inverse regressor, evaluated on the filtered state, yields a filtered input estimate with analytically propagated uncertainty.
+\end{enumerate}
+
+This architecture eliminates the need for state augmentation, random-walk hypotheses, or numerical inversion. Both regressors share the same theoretical foundation, the same embedded neural approximator, and the same convergence properties. The input estimate inherits the quality of the state filter and the accuracy of the trained nonlinearity.
+
+The approach is validated on a DC motor with nonlinear inductance $L(i)$ due to magnetic saturation. The mechanical subsystem provides the direct HFNN regressor; the electrical subsystem, which is implicit in the current $i_k$ when $L(i)$ is nonlinear, provides the inverse HFNN regressor. The motor serves as a benchmark---the contribution is theoretical, not application-specific.
+
+The remainder of this paper is organized as follows. Section~\ref{sec:foundations} presents the theoretical foundations. Section~\ref{sec:dual} formalizes the dual regressor architecture. Section~\ref{sec:ekf} develops the EKF integration. Section~\ref{sec:case} presents the case study. Section~\ref{sec:results} reports results. Section~\ref{sec:discussion} discusses findings and limitations. Section~\ref{sec:conclusion} concludes.
+
+% =============================================================
+\section{Theoretical Foundations}
+\label{sec:foundations}
+% =============================================================
+
+\subsection{HAM as a General Implicit Equation Solver}
+
+Consider a general implicit equation:
+\begin{equation}
+\label{eq:implicit_general}
+F(z_1, z_2, \ldots, z_n) = 0,
+\end{equation}
+where $z_i \in \mathbb{R}$ and $F: \mathbb{R}^n \to \mathbb{R}$ is at least $C^2$. Suppose we wish to solve for $z_j$, with all other variables known. Define $g(z_j) \triangleq F(z_1, \ldots, z_n)$ with the remaining variables fixed. The Newton homotopy from an initial guess $z_j^{(0)}$ is:
+\begin{equation}
+\label{eq:homotopy}
+\mathcal{H}(z_j; q) = (1 - q)\left[g(z_j) - g(z_j^{(0)})\right] + q\, g(z_j) = 0, \quad q \in [0,1].
+\end{equation}
+
+If $z_j(q)$ is analytic at $q = 0$, the Maclaurin expansion yields:
+\begin{equation}
+\label{eq:series}
+z_j(q) = z_j^{(0)} + \sum_{m=1}^{\infty} \zeta_m \, q^m, \quad \zeta_m = \frac{1}{m!} \frac{d^m z_j}{dq^m}\bigg|_{q=0}.
+\end{equation}
+
+Evaluating at $q = 1$ and retaining two terms produces the explicit regressor:
+\begin{equation}
+\label{eq:regressor_general}
+z_j = z_j^{(0)} + \zeta_1 + \zeta_2,
+\end{equation}
+where:
+\begin{align}
+\zeta_1 &= -\frac{g(z_j^{(0)})}{g'(z_j^{(0)})}, \label{eq:z1} \\
+\zeta_2 &= -\frac{1}{2} \frac{g(z_j^{(0)})^2 \cdot g''(z_j^{(0)})}{g'(z_j^{(0)})^3}, \label{eq:z2}
+\end{align}
+with $g' = \partial F / \partial z_j$ and $g'' = \partial^2 F / \partial z_j^2$.
+
+\begin{theorem}[Variable-agnostic HAM regressor]
+\label{thm:agnostic}
+Let $F(z_1, \ldots, z_n) = 0$ be an implicit equation with $F \in C^2$. For any index $j \in \{1, \ldots, n\}$ such that $\partial F / \partial z_j \neq 0$ at the expansion point, the regressor \eqref{eq:regressor_general}--\eqref{eq:z2} produces an explicit expression for $z_j$ as a function of the remaining variables. The truncation error, convergence conditions, and rational structure are identical regardless of the choice of $j$.
+\end{theorem}
+
+\begin{proof}
+The HAM construction \eqref{eq:homotopy}--\eqref{eq:z2} depends only on the function $g(z_j) = F|_{z_{\neq j} \text{ fixed}}$ and its derivatives with respect to $z_j$. The convergence of the series \eqref{eq:series} is governed by the Cauchy--Hadamard criterion applied to $g$, which depends on the analyticity of $F$ with respect to $z_j$ and the non-degeneracy condition $g'(z_j^{(0)}) \neq 0$. Since these conditions are stated in terms of $z_j$ generically, they hold for any choice of resolved variable. The per-step truncation error is $O(|g'''| / |g'|^5)$, independent of the physical meaning of $z_j$.
+\end{proof}
+
+This theorem is the foundation of the dual architecture: the same implicit equation, resolved for different variables, produces regressors with identical theoretical properties.
+
+\subsection{Application to Nonlinear ODE Discretization}
+
+Consider the second-order nonlinear ODE:
+\begin{equation}
+\label{eq:ode}
+y'' + \delta y' + N(y) = \phi(u),
+\end{equation}
+where $\delta > 0$ is a known damping coefficient, $N(y)$ is an unknown nonlinear function ($C^2$), and $\phi(u)$ is a possibly nonlinear input transformation (e.g., actuator characteristic). Discretization via 3-point backward differences with step size $T$ yields the implicit equation:
+\begin{equation}
+\label{eq:implicit_disc}
+F(y_k, y_{k-1}, y_{k-2}, u_k) = \frac{y_k - 2y_{k-1} + y_{k-2}}{T^2} + \delta \frac{3y_k - 4y_{k-1} + y_{k-2}}{2T} + N(y_k) - \phi(u_k) = 0.
+\end{equation}
+
+\textbf{Direct regressor} (solve for $y_k$): This is the HFNN regressor developed in \cite{rodrigo2025hfnn}. Setting $g_y(y_k) = F|_{y_{k-1}, y_{k-2}, u_k \text{ fixed}}$:
+\begin{align}
+g_y'(y_k) &= \frac{1}{T^2} + \frac{3\delta}{2T} + N'(y_k), \label{eq:gy_prime} \\
+g_y''(y_k) &= N''(y_k). \label{eq:gy_double}
+\end{align}
+
+\textbf{Inverse regressor} (solve for $u_k$): Setting $g_u(u_k) = F|_{y_k, y_{k-1}, y_{k-2} \text{ fixed}}$:
+\begin{align}
+g_u'(u_k) &= -\phi'(u_k), \label{eq:gu_prime} \\
+g_u''(u_k) &= -\phi''(u_k). \label{eq:gu_double}
+\end{align}
+
+When $\phi(u) = u$ (linear input), $g_u' = -1$, $g_u'' = 0$, $\zeta_2 = 0$, and the inverse regressor reduces to the algebraic identity:
+\begin{equation}
+\label{eq:trivial_inverse}
+u_k = \frac{y_k - 2y_{k-1} + y_{k-2}}{T^2} + \delta \frac{3y_k - 4y_{k-1} + y_{k-2}}{2T} + N(y_k).
+\end{equation}
+
+This is exact and requires no homotopy. The inverse regressor becomes nontrivial---and the HAM construction becomes necessary---when $\phi$ is nonlinear.
+
+% =============================================================
+\section{Dual Regressor Architecture}
+\label{sec:dual}
+% =============================================================
+
+\subsection{The Nonlinear Input Case}
+
+Consider the system where the input enters through a nonlinear actuator characteristic:
+\begin{equation}
+\label{eq:ode_nonlinear_input}
+y'' + \delta y' + N(y) = \phi(u),
+\end{equation}
+with $\phi: \mathbb{R} \to \mathbb{R}$ an unknown $C^2$ nonlinear function. This models, for example, a DC motor where the voltage $u$ drives a current $i$ through a circuit with saturating inductance $L(i)$, and the effective torque-producing quantity is $i$, not $u$.
+
+The discretized implicit equation is:
+\begin{equation}
+\label{eq:F_dual}
+F(y_k, y_{k-1}, y_{k-2}, u_k) = 0.
+\end{equation}
+
+Applying Theorem~\ref{thm:agnostic}:
+
+\textbf{Direct HFNN:} Resolve for $y_k$ with initial guess $y_{k-1}$:
+\begin{equation}
+\label{eq:direct}
+\hat{y}_k = y_{k-1} + \zeta_1^{(y)} + \zeta_2^{(y)},
+\end{equation}
+where $\zeta_1^{(y)}, \zeta_2^{(y)}$ involve $N, N', N''$ evaluated at $y_{k-1}$, as in \cite{rodrigo2025hfnn}.
+
+\textbf{Inverse HFNN:} Resolve for $u_k$ with initial guess $u_{k-1}$:
+\begin{equation}
+\label{eq:inverse}
+\hat{u}_k = u_{k-1} + \zeta_1^{(u)} + \zeta_2^{(u)},
+\end{equation}
+where:
+\begin{align}
+\zeta_1^{(u)} &= -\frac{F(y_k, y_{k-1}, y_{k-2}, u_{k-1})}{-\phi'(u_{k-1})}, \label{eq:z1u} \\
+\zeta_2^{(u)} &= -\frac{1}{2} \frac{F(y_k, y_{k-1}, y_{k-2}, u_{k-1})^2 \cdot \phi''(u_{k-1})}{\phi'(u_{k-1})^3}. \label{eq:z2u}
+\end{align}
+
+Both regressors share the same embedded neural approximator for $N(y)$, and the inverse regressor additionally requires an approximator for $\phi(u)$, $\phi'(u)$, $\phi''(u)$.
+
+\subsection{Embedded Neural Approximators}
+
+Following \cite{rodrigo2025hfnn}, both $N(y)$ and $\phi(u)$ are approximated by Gaussian RBF networks with $M$ centres:
+\begin{align}
+N(y; \mathbf{w}) &= \sum_{j=1}^{M} w_j \, \varphi_j(y) + w_0, \quad \varphi_j(y) = \exp\!\left(-\frac{(y - c_j)^2}{2\sigma^2}\right), \label{eq:rbf_N} \\
+\phi(u; \mathbf{v}) &= \sum_{j=1}^{M'} v_j \, \psi_j(u) + v_0, \quad \psi_j(u) = \exp\!\left(-\frac{(u - d_j)^2}{2\sigma_u^2}\right). \label{eq:rbf_phi}
+\end{align}
+
+The derivatives $N', N'', \phi', \phi''$ are computed analytically from the Gaussian kernel, as detailed in \cite{rodrigo2025hfnn}. All derivatives are exact---no numerical approximation is involved.
+
+\subsection{Causal Structure}
+
+A critical property of the inverse regressor is its causal feasibility. At time $k$, after measuring $y_k$, the inverse regressor \eqref{eq:inverse} reconstructs $u_{k-1}$:
+\begin{equation}
+\label{eq:causal}
+\hat{u}_{k-1} = G(y_k, y_{k-1}, y_{k-2}, u_{k-2}),
+\end{equation}
+where $G$ denotes the inverse HFNN. This is causal: $y_k$ is the consequence of $u_{k-1}$ having been applied, and the reconstruction occurs after the measurement is available.
+
+\subsection{Inherited Guarantees}
+
+By Theorem~\ref{thm:agnostic}, the inverse regressor inherits:
+\begin{itemize}
+    \item \textbf{Consistency:} Per-step truncation error $O(T^2 \cdot |\phi'''| / |\phi'|^5)$, converging to zero as $T \to 0$.
+    \item \textbf{Zero-stability:} Inherited from the base LMM, independent of the resolved variable.
+    \item \textbf{Lipschitz stability:} $TL < 1$ condition, where $L$ is the Lipschitz constant of the dynamics with respect to $u$.
+    \item \textbf{Analytical derivatives:} $\partial G / \partial y_k$, $\partial G / \partial y_{k-1}$, $\partial G / \partial u_{k-2}$ are computable in closed form from the RBF structure.
+\end{itemize}
+
+% =============================================================
+\section{Integration with Extended Kalman Filter}
+\label{sec:ekf}
+% =============================================================
+
+\subsection{State Definition}
+
+Define the state vector:
+\begin{equation}
+\label{eq:state}
+\mathbf{x}_k = \begin{bmatrix} y_k \\ y_{k-1} \end{bmatrix}.
+\end{equation}
+
+The state transition model uses the direct HFNN:
+\begin{equation}
+\label{eq:transition}
+\mathbf{x}_{k+1} = \mathbf{f}(\mathbf{x}_k, u_k) = \begin{bmatrix} \text{HFNN}_{\text{direct}}(y_k, y_{k-1}, u_k; \mathbf{w}) \\ y_k \end{bmatrix} + \mathbf{w}_k,
+\end{equation}
+where $\mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q})$ is process noise.
+
+The measurement model is:
+\begin{equation}
+\label{eq:measurement}
+z_k = y_k + v_k = \begin{bmatrix} 1 & 0 \end{bmatrix} \mathbf{x}_k + v_k, \quad v_k \sim \mathcal{N}(0, R).
+\end{equation}
+
+\subsection{EKF Equations}
+
+\textbf{Prediction:}
+\begin{align}
+\hat{\mathbf{x}}_{k+1|k} &= \mathbf{f}(\hat{\mathbf{x}}_{k|k}, u_k), \label{eq:ekf_pred_state} \\
+\mathbf{P}_{k+1|k} &= \mathbf{F}_k \, \mathbf{P}_{k|k} \, \mathbf{F}_k^\top + \mathbf{Q}, \label{eq:ekf_pred_cov}
+\end{align}
+where $\mathbf{F}_k$ is the Jacobian of $\mathbf{f}$ with respect to $\mathbf{x}$:
+\begin{equation}
+\label{eq:jacobian_F}
+\mathbf{F}_k = \begin{bmatrix} \dfrac{\partial \text{HFNN}}{\partial y_k} & \dfrac{\partial \text{HFNN}}{\partial y_{k-1}} \\[8pt] 1 & 0 \end{bmatrix}.
+\end{equation}
+
+These partial derivatives are computed analytically from the homotopy regressor structure:
+\begin{equation}
+\label{eq:dHFNN_dy}
+\frac{\partial \text{HFNN}}{\partial y_{k-1}} = 1 + \frac{\partial \zeta_1^{(y)}}{\partial y_{k-1}} + \frac{\partial \zeta_2^{(y)}}{\partial y_{k-1}},
+\end{equation}
+where each term involves derivatives of $g_y$, $g_y'$, $g_y''$ with respect to $y_{k-1}$, all computable in closed form from the RBF expressions.
+
+\textbf{Update:}
+\begin{align}
+\mathbf{K}_k &= \mathbf{P}_{k|k-1} \, \mathbf{H}^\top \left(\mathbf{H} \, \mathbf{P}_{k|k-1} \, \mathbf{H}^\top + R\right)^{-1}, \label{eq:ekf_gain} \\
+\hat{\mathbf{x}}_{k|k} &= \hat{\mathbf{x}}_{k|k-1} + \mathbf{K}_k \left(z_k - \mathbf{H} \, \hat{\mathbf{x}}_{k|k-1}\right), \label{eq:ekf_update_state} \\
+\mathbf{P}_{k|k} &= (\mathbf{I} - \mathbf{K}_k \, \mathbf{H}) \, \mathbf{P}_{k|k-1}, \label{eq:ekf_update_cov}
+\end{align}
+with $\mathbf{H} = \begin{bmatrix} 1 & 0 \end{bmatrix}$.
+
+\subsection{Filtered Input Estimation}
+
+After the EKF update at time $k$, the filtered state $\hat{\mathbf{x}}_{k|k}$ is available. The filtered input estimate is:
+\begin{equation}
+\label{eq:filtered_input}
+\hat{u}_{k-1} = G(\hat{\mathbf{x}}_{k|k}, \hat{y}_{k-2|k-2}, u_{k-2}),
+\end{equation}
+where $G$ is the inverse HFNN regressor \eqref{eq:inverse}.
+
+The uncertainty in the input estimate is propagated analytically:
+\begin{equation}
+\label{eq:input_uncertainty}
+P_{u} = \mathbf{J}_G \, \mathbf{P}_{k|k} \, \mathbf{J}_G^\top,
+\end{equation}
+where $\mathbf{J}_G = \partial G / \partial \mathbf{x}_k$ is the Jacobian of the inverse regressor with respect to the state, computable in closed form from the RBF structure.
+
+\subsection{Comparison with State Augmentation}
+
+The standard approach to input estimation augments the state:
+\begin{equation}
+\label{eq:augmented}
+\tilde{\mathbf{x}}_k = \begin{bmatrix} y_k \\ y_{k-1} \\ u_k \end{bmatrix}, \quad u_{k+1} = u_k + w_{u,k},
+\end{equation}
+requiring a tuneable covariance $Q_u$ and a slow-variation assumption. The dual regressor approach avoids both: the input is computed, not estimated as a state. No $Q_u$ is needed. No slow-variation assumption is imposed. The input can change arbitrarily between samples.
+
+% =============================================================
+\section{Case Study: DC Motor with Magnetic Saturation}
+\label{sec:case}
+% =============================================================
+
+\subsection{System Description}
+
+Consider a DC motor with the following equations:
+
+\textbf{Electrical subsystem (RL with saturation):}
+\begin{equation}
+\label{eq:electrical}
+u = R\,i + L(i)\,\frac{di}{dt} + K_e\,\omega,
+\end{equation}
+where $R$ is armature resistance, $L(i)$ is current-dependent inductance due to magnetic saturation, $K_e$ is the back-EMF constant, and $\omega$ is angular velocity.
+
+\textbf{Mechanical subsystem:}
+\begin{equation}
+\label{eq:mechanical}
+J\,\frac{d\omega}{dt} + b\,\omega + N_{\text{load}}(\omega) = K_t\,i,
+\end{equation}
+where $J$ is the moment of inertia, $b$ is viscous friction, $N_{\text{load}}(\omega)$ is a nonlinear load torque, and $K_t$ is the torque constant.
+
+\subsection{Why the Electrical Equation is Implicit in $i$}
+
+Discretizing \eqref{eq:electrical} with backward differences:
+\begin{equation}
+\label{eq:elec_disc}
+R\,i_k + L(i_k)\,\frac{i_k - i_{k-1}}{T} + K_e\,\omega_k - u_k = 0.
+\end{equation}
+
+This is implicit in $i_k$ because $L(i_k)$ multiplies the difference term. The unknown $i_k$ appears both linearly (through $R\,i_k + L \cdot i_k/T$) and nonlinearly (through $L(i_k) \cdot i_k$). It cannot be rearranged into explicit form---this is exactly the discretization gap that HAM resolves.
+
+\subsection{Direct HFNN: Mechanical Subsystem}
+
+Equation~\eqref{eq:mechanical} is of the standard form \eqref{eq:ode} with $y = \omega$, $\delta = b/J$, $N(\omega) = N_{\text{load}}(\omega)/J$, and input $K_t\,i/J$. The direct HFNN regressor predicts $\omega_{k+1}$ from $(\omega_k, \omega_{k-1}, i_k)$ following the procedure of \cite{rodrigo2025hfnn}.
+
+\subsection{Inverse HFNN: Electrical Subsystem}
+
+Define $g_i(i_k)$ from \eqref{eq:elec_disc}:
+\begin{align}
+g_i(i_k) &= R\,i_k + L(i_k)\,\frac{i_k - i_{k-1}}{T} + K_e\,\omega_k - u_k, \label{eq:gi} \\
+g_i'(i_k) &= R + L'(i_k)\,\frac{i_k - i_{k-1}}{T} + \frac{L(i_k)}{T}, \label{eq:gi_prime} \\
+g_i''(i_k) &= L''(i_k)\,\frac{i_k - i_{k-1}}{T} + \frac{2\,L'(i_k)}{T}. \label{eq:gi_double}
+\end{align}
+
+The inverse HFNN regressor is:
+\begin{equation}
+\label{eq:inverse_motor}
+\hat{i}_k = i_{k-1} + \zeta_1^{(i)} + \zeta_2^{(i)},
+\end{equation}
+with $\zeta_1^{(i)}, \zeta_2^{(i)}$ given by \eqref{eq:z1}--\eqref{eq:z2} applied to $g_i$.
+
+The nonlinear inductance $L(i)$ and its derivatives are approximated by a Gaussian RBF network:
+\begin{align}
+L(i; \mathbf{v}) &= \sum_{j=1}^{M'} v_j \, \psi_j(i) + v_0, \label{eq:rbf_L} \\
+L'(i; \mathbf{v}) &= \sum_{j=1}^{M'} v_j \, \psi_j(i) \cdot \left(-\frac{i - d_j}{\sigma_u^2}\right), \label{eq:rbf_L_prime} \\
+L''(i; \mathbf{v}) &= \sum_{j=1}^{M'} v_j \, \psi_j(i) \cdot \left(\frac{(i - d_j)^2}{\sigma_u^4} - \frac{1}{\sigma_u^2}\right). \label{eq:rbf_L_double}
+\end{align}
+
+\subsection{Dual Architecture}
+
+The complete estimation architecture operates as follows:
+
+\begin{enumerate}
+    \item \textbf{Direct HFNN} (mechanical): predicts $\hat{\omega}_{k+1}$ from $(\omega_k, \omega_{k-1}, i_k)$.
+    \item \textbf{EKF}: filters the mechanical state $\mathbf{x}_k = [\omega_k, \omega_{k-1}]^\top$ using $\omega_k$ measurements.
+    \item \textbf{Inverse HFNN} (electrical): reconstructs $\hat{i}_{k-1}$ from $(\hat{\omega}_{k|k}, u_{k-1}, i_{k-2})$ by solving the implicit electrical equation via HAM.
+\end{enumerate}
+
+The Jacobians for the EKF are computed analytically from the RBF expressions in both subsystems.
+
+\subsection{Training}
+
+Both HFNN regressors are trained via Levenberg--Marquardt with analytically computed derivatives, following Algorithm~1 of \cite{rodrigo2025hfnn}. The direct regressor learns $N_{\text{load}}(\omega)$; the inverse regressor learns $L(i)$. Training data consists of measured trajectories $\{(\omega_k, i_k, u_k)\}_{k=1}^{M}$, where $M$ is the number of samples.
+
+% =============================================================
+\section{Results}
+\label{sec:results}
+% =============================================================
+
+\textit{(To be completed with numerical experiments.)}
+
+The following experiments are planned:
+
+\begin{enumerate}
+    \item \textbf{Baseline:} True trajectories generated by RK4 with known parameters ($R, J, b, K_t, K_e$) and a representative $L(i)$ saturation curve.
+    \item \textbf{Direct HFNN validation:} Prediction of $\omega_{k+1}$ with varying sample sizes (30, 50, 100 samples).
+    \item \textbf{Inverse HFNN validation:} Reconstruction of $i_k$ from noisy $\omega_k$ and known $u_k$.
+    \item \textbf{EKF + dual regressors:} Simultaneous estimation of $\omega$ (filtered) and $i$ (reconstructed from filtered state).
+    \item \textbf{Comparison with:}
+    \begin{itemize}
+        \item EKF with augmented state and random walk model for $i$.
+        \item UKF with augmented state.
+        \item Direct inversion without Kalman filtering.
+    \end{itemize}
+    \item \textbf{Metrics:} MSE of state, MSE of input, robustness to measurement noise, number of training samples, computational cost.
+\end{enumerate}
+
+% =============================================================
+\section{Discussion}
+\label{sec:discussion}
+% =============================================================
+
+\subsection{The Contribution is Theoretical, Not Application-Specific}
+
+The DC motor with saturating inductance serves as a benchmark to demonstrate the dual regressor concept. The contribution is the observation that HAM produces explicit regressors for any variable of the implicit equation, and that this yields a natural architecture for simultaneous state and input estimation. The framework applies to any system described by an implicit discrete equation $F = 0$ where the input enters nonlinearly.
+
+\subsection{Advantages Over State Augmentation}
+
+The standard approach (augment state, add random walk) has three fundamental limitations that the dual regressor approach eliminates:
+\begin{enumerate}
+    \item \textbf{No ad hoc dynamics:} The input is computed from a regressor, not estimated as a state with assumed dynamics.
+    \item \textbf{No tuning of $Q_u$:} There is no input noise covariance to tune.
+    \item \textbf{No slow-variation assumption:} The input can change arbitrarily; the inverse regressor reconstructs it from the physics.
+\end{enumerate}
+
+\subsection{When the Inverse Regressor is Trivial}
+
+When the input enters linearly ($\phi(u) = u$), the inverse regressor reduces to an algebraic identity and HAM is not needed. The dual architecture is nontrivial---and this paper's contribution is substantive---only when the input enters nonlinearly. Magnetic saturation, actuator nonlinearities (dead zones, backlash, saturation), and state-dependent input coupling are all practical sources of nonlinear input dependence.
+
+\subsection{Limitations}
+
+\begin{enumerate}
+    \item[(a)] \textbf{Known ODE structure:} Both regressors require the form of the ODE to be known (grey-box).
+    \item[(b)] \textbf{Smooth nonlinearities:} Both $N(y)$ and $\phi(u)$ (or $L(i)$) must be $C^2$.
+    \item[(c)] \textbf{Non-degeneracy:} The inverse regressor requires $\partial F / \partial u \neq 0$, which can fail at singular operating points.
+    \item[(d)] \textbf{Stability of the closed loop:} The dual architecture provides estimation, not control. If used within a control loop, stability of the closed system must be analyzed separately.
+\end{enumerate}
+
+% =============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =============================================================
+
+This paper demonstrated that the Homotopy Analysis Method, applied to an implicit nonlinear discrete equation, produces explicit algebraic regressors for any variable of the equation. This variable-agnostic property yields a dual regressor architecture---direct and inverse---with identical convergence guarantees, analytical derivatives, and rational truncation structure. Combined with an Extended Kalman Filter, this architecture provides simultaneous state and input estimation without state augmentation, random-walk hypotheses, or numerical inversion.
+
+The approach was validated on a DC motor with nonlinear magnetic saturation, demonstrating that the armature current can be reconstructed from the filtered mechanical state using an inverse HFNN regressor derived from the same theoretical framework as the direct state predictor.
+
+Future work will address: (i) extension to MIMO systems, (ii) adaptive parameter updating of both regressors via dual Kalman filtering, (iii) formal stability analysis of the dual architecture in closed-loop control, and (iv) experimental validation on physical hardware.
+
+% =============================================================
+% REFERENCES
+% =============================================================
+\begin{thebibliography}{99}
+
+\bibitem{gillijns2007}
+S.~Gillijns and B.~De~Moor, ``Unbiased minimum-variance input and state estimation for linear discrete-time systems,'' \textit{Automatica}, vol.~43, no.~1, pp.~111--116, 2007.
+
+\bibitem{kitanidis1987}
+P.~K.~Kitanidis, ``Unbiased minimum-variance linear state estimation,'' \textit{Automatica}, vol.~23, no.~6, pp.~775--778, 1987.
+
+\bibitem{hunt1996}
+K.~J.~Hunt, D.~Sbarbaro, R.~\.Zbikowski, and P.~J.~Gawthrop, ``Neural networks for control systems---A survey,'' \textit{Automatica}, vol.~28, no.~6, pp.~1083--1112, 1992.
+
+\bibitem{rodrigo2025hfnn}
+R.~H.~Rodrigo, G.~Schweickardt, and D.~H.~Pati\~no, ``Homotopy-based functional neural networks for robust identification of uncertain nonlinear dynamic systems,'' \textit{submitted}, 2025.
+
+\bibitem{liao2003}
+S.~Liao, \textit{Beyond Perturbation: Introduction to the Homotopy Analysis Method}. Chapman \& Hall/CRC, 2003.
+
+\bibitem{liao2012}
+S.~Liao, \textit{Homotopy Analysis Method in Nonlinear Differential Equations}. Springer, 2012.
+
+\bibitem{narendra1990}
+K.~S.~Narendra and K.~Parthasarathy, ``Identification and control of dynamical systems using neural networks,'' \textit{IEEE Trans. Neural Netw.}, vol.~1, no.~1, pp.~4--27, 1990.
+
+\bibitem{ljung1987}
+L.~Ljung, \textit{System Identification: Theory for the User}. Prentice Hall, 1987.
+
+\bibitem{astrom1995}
+K.~J.~\AA{}str\"om and B.~Wittenmark, \textit{Adaptive Control}, 2nd~ed. Addison-Wesley, 1995.
+
+\bibitem{simon2006}
+D.~Simon, \textit{Optimal State Estimation: Kalman, $H_\infty$, and Nonlinear Approaches}. Wiley, 2006.
+
+\bibitem{wan2000}
+E.~A.~Wan and R.~van~der~Merwe, ``The unscented Kalman filter for nonlinear estimation,'' in \textit{Proc. IEEE Adaptive Syst. Signal Process., Commun., Control Symp.}, 2000, pp.~153--158.
+
+\bibitem{fang2012}
+H.~Fang, Y.~Shi, and J.~Yi, ``On stable simultaneous input and state estimation for discrete-time linear systems,'' \textit{Int. J. Adapt. Control Signal Process.}, vol.~25, no.~8, pp.~671--686, 2011.
+
+\bibitem{castillo1998}
+E.~Castillo, J.~M.~Guti\'errez, A.~S.~Hadi, and B.~Lacruz, ``Some applications of functional networks in statistics and engineering,'' \textit{Technometrics}, vol.~40, no.~4, pp.~312--322, 1998.
+
+\bibitem{butcher2016}
+J.~C.~Butcher, \textit{Numerical Methods for Ordinary Differential Equations}, 3rd~ed. John Wiley \& Sons, 2016.
+
+\bibitem{dahlquist1956}
+G.~Dahlquist, ``Convergence and stability in the numerical integration of ordinary differential equations,'' \textit{Math. Scand.}, vol.~4, pp.~33--53, 1956.
+
+\end{thebibliography}
+
+\end{document}

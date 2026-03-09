@@ -1,0 +1,189 @@
+================================================================================
+        RESUMEN EJECUTIVO: REGRESOR HOMOTÓPICO vs RK4
+================================================================================
+
+Fecha: 26 de Febrero de 2026
+Autor: Rodolfo H. Rodrigo - UNSJ
+
+================================================================================
+OBJETIVO
+================================================================================
+
+Evaluar el desempeño del regresor homotópico de 3 puntos comparado con
+el método clásico Runge-Kutta de 4to orden (RK4) para diferentes tipos
+de ecuaciones diferenciales lineales y no lineales.
+
+================================================================================
+MÉTODO
+================================================================================
+
+REGRESOR HOMOTÓPICO:
+  - Diferencias finitas hacia atrás (3 puntos)
+  - Serie homotópica con 3 términos correctores (z₁, z₂, z₃)
+  - Sin iteración: solo 3 correcciones por paso
+  - Requiere derivadas: f, f', f'', f'''
+
+RK4 CLÁSICO:
+  - 4 evaluaciones por paso (k₁, k₂, k₃, k₄)
+  - No requiere derivadas
+  - Error O(h⁵)
+
+================================================================================
+ECUACIONES PROBADAS
+================================================================================
+
+PRIMER ORDEN:
+  1. Lineal:          y' + 2y = sin(5t)
+  2. Cuadrática:      y' + y² = sin(5t)
+  3. Trigonométrica:  y' + sin²(y) = sin(5t)
+  4. Cúbica:          y' + β(y) = sin(5t)
+
+SEGUNDO ORDEN:
+  5. Oscilador Armónico:  y'' + 4y = sin(3t)
+  6. Péndulo Amortiguado: y'' + 0.1y' + sin(y) = sin(3t)
+  7. Oscilador Duffing:   y'' + 0.1y' + y + 0.2y³ = 0.3·cos(1.2t)
+  8. Van der Pol:         y'' - μ(1-y²)y' + y = 0.5·sin(1.5t)
+
+================================================================================
+RESULTADOS PRINCIPALES
+================================================================================
+
+┌──────────────────────────────┬──────────────┬──────────────┬─────────────┐
+│ Test                         │ Error Máximo │ Error RMS    │ Evaluación  │
+├──────────────────────────────┼──────────────┼──────────────┼─────────────┤
+│ 1. Lineal 1er Orden          │  1.93e-04    │  1.07e-04    │ ⭐⭐⭐⭐⭐      │
+│ 2. Cuadrática                │  4.41e-02    │  8.71e-03    │ ⭐⭐⭐⭐       │
+│ 3. Trigonométrica            │  2.19e-02    │  5.47e-03    │ ⭐⭐⭐⭐       │
+│ 4. Cúbica                    │  2.33e-04    │  1.22e-04    │ ⭐⭐⭐⭐⭐      │
+│ 5. Oscilador Armónico        │  4.88e-02    │  2.34e-02    │ ⭐⭐⭐        │
+│ 6. Péndulo Amortiguado       │  3.63e-02    │  2.13e-02    │ ⭐⭐⭐        │
+│ 7. Duffing                   │  1.04e+00    │  3.49e-01    │ ⭐⭐         │
+│ 8. Van der Pol               │  1.44e+00    │  4.53e-01    │ ⭐⭐         │
+└──────────────────────────────┴──────────────┴──────────────┴─────────────┘
+
+================================================================================
+ANÁLISIS POR CATEGORÍA
+================================================================================
+
+┌─────────────────────────────┬──────────────────┬──────────────────┐
+│ Tipo de Ecuación            │ Rango de Error   │ Desempeño        │
+├─────────────────────────────┼──────────────────┼──────────────────┤
+│ Lineales (1er orden)        │ 10⁻⁴             │ EXCELENTE        │
+│ No Lineales Moderadas (1er) │ 10⁻² a 10⁻³      │ MUY BUENO        │
+│ Lineales (2do orden)        │ 10⁻²             │ BUENO            │
+│ No Lineales Moderadas (2do) │ 10⁻²             │ BUENO            │
+│ Muy No Lineales/Caóticas    │ 10⁰ a 10¹        │ LIMITADO         │
+└─────────────────────────────┴──────────────────┴──────────────────┘
+
+================================================================================
+HALLAZGOS CLAVE
+================================================================================
+
+✓ FORTALEZAS:
+
+  1. El regresor homotópico es MUY COMPETITIVO con RK4 para ecuaciones
+     lineales y moderadamente no lineales
+
+  2. Precisión excelente en ecuaciones lineales (error ~10⁻⁴)
+
+  3. Muy eficiente: tiempos de ejecución de 2-21 ms
+
+  4. Simple de implementar: solo 3 correcciones por paso
+
+  5. Ideal para sistemas embebidos y microcontroladores
+
+✗ LIMITACIONES:
+
+  1. Sistemas muy no lineales (Duffing, Van der Pol) muestran
+     errores significativos (O(1))
+
+  2. Requiere derivadas de f (analíticas o numéricas)
+
+  3. Para sistemas caóticos, necesita pasos temporales muy pequeños
+
+  4. Acumulación de errores en simulaciones largas con alta no linealidad
+
+================================================================================
+COMPARACIÓN CUANTITATIVA: REGRESOR vs RK4
+================================================================================
+
+                        REGRESOR        RK4
+                        --------        ----
+Evaluaciones/paso:      3 + derivs      4
+Requiere derivadas:     SÍ              NO
+Precisión (lineal):     ~10⁻⁴           ~10⁻⁵
+Precisión (no lineal):  ~10⁻² a 10⁻³    ~10⁻⁴
+Velocidad:              MUY RÁPIDO      RÁPIDO
+Complejidad:            SIMPLE          ESTÁNDAR
+Sistemas caóticos:      LIMITADO        BUENO
+
+================================================================================
+CONCLUSIONES
+================================================================================
+
+1. El regresor homotópico es una EXCELENTE ALTERNATIVA a RK4 para:
+   • Ecuaciones lineales
+   • Ecuaciones moderadamente no lineales
+   • Sistemas embebidos/tiempo real
+   • Cuando se requiere eficiencia computacional
+
+2. Para sistemas altamente no lineales o caóticos, SE RECOMIENDA:
+   • Usar RK4 o métodos adaptativos (RK45)
+   • Reducir significativamente el paso temporal
+   • Considerar métodos especializados (simplécticos, etc.)
+
+3. El regresor muestra un EXCELENTE BALANCE entre:
+   • Simplicidad de implementación
+   • Eficiencia computacional
+   • Precisión adecuada
+
+================================================================================
+RECOMENDACIONES
+================================================================================
+
+USAR REGRESOR HOMOTÓPICO:
+  ✓ Ecuaciones lineales o moderadamente no lineales
+  ✓ Sistemas embebidos / microcontroladores
+  ✓ Control en tiempo real
+  ✓ Cuando se pueden calcular derivadas fácilmente
+
+USAR RK4 O SUPERIOR:
+  ✓ Sistemas altamente no lineales
+  ✓ Dinámicas caóticas
+  ✓ Máxima precisión requerida
+  ✓ Derivadas difíciles de obtener
+
+MEJORAS PROPUESTAS AL REGRESOR:
+  1. Implementar control adaptativo del paso temporal
+  2. Usar 4 puntos en lugar de 3 para mayor precisión
+  3. Agregar estimación de error local
+  4. Incluir más términos homotópicos (z₄, z₅) para casos difíciles
+
+================================================================================
+IMPACTO PRÁCTICO
+================================================================================
+
+El regresor homotópico demostró ser:
+
+  • VIABLE para aplicaciones industriales en control de procesos
+  • EFICIENTE para implementación en hardware limitado
+  • PRECISO para la mayoría de aplicaciones de ingeniería
+  • SIMPLE para integrar en código existente
+
+Los resultados validan el uso del regresor como alternativa práctica
+a métodos clásicos en escenarios donde la eficiencia y simplicidad
+son prioritarias.
+
+================================================================================
+ARCHIVOS GENERADOS
+================================================================================
+
+Reporte completo:        REPORTE_REGRESSOR_VS_RK4.md
+Código de pruebas:       test_regressor_vs_rk4.py
+Exportación de datos:    export_results_csv.py
+Resumen CSV:             resumen_comparacion.csv
+Datos individuales:      test1_*.csv a test8_*.csv
+
+================================================================================
+FIN DEL RESUMEN EJECUTIVO
+================================================================================
