@@ -1,11 +1,15 @@
 # Tikhonov Integral Inversion (TII)
 
+[![DOI](https://img.shields.io/badge/DOI-10.6084%2Fm9.figshare.31920189-blue)](https://doi.org/10.6084/m9.figshare.31920189)
+
 **Paper 10** — Tikhonov Integral Inversion for Simultaneous State and Input
 Estimation in Nonlinear Systems Using Dual Homotopy-Based Regressors.
 
 **Target:** *IEEE Transactions on Systems, Man, and Cybernetics: Systems*
 
-**Authors:** Rodolfo H. Rodrigo, Gustavo Schweickardt, Daniel H. Patiño
+**Authors:** Rodolfo H. Rodrigo ([ORCID: 0000-0002-8787-0038](https://orcid.org/0000-0002-8787-0038)), Gustavo Schweickardt, Daniel H. Patiño
+
+**Repository:** https://doi.org/10.6084/m9.figshare.31920189
 
 ---
 
@@ -163,6 +167,8 @@ The core library in `src/` provides:
 
 ## Citation
 
+### Paper
+
 ```bibtex
 @article{rodrigo2026tii,
   title={Tikhonov Integral Inversion for Simultaneous State and Input
@@ -172,6 +178,18 @@ The core library in `src/` provides:
   journal={IEEE Trans. Syst., Man, Cybern., Syst.},
   year={2026},
   note={Submitted}
+}
+```
+
+### Code Repository
+
+```bibtex
+@software{rodrigo2026tii_code,
+  author = {Rodrigo, Rodolfo H.},
+  title = {Tikhonov Integral Inversion - Implementation and Reproducibility Code},
+  year = {2026},
+  doi = {10.6084/m9.figshare.31920189},
+  url = {https://doi.org/10.6084/m9.figshare.31920189}
 }
 ```
 
