@@ -57,6 +57,11 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "--tests" ]; then
     run_step "CaseStudy_4 tests (direct regressor robustness)" CaseStudy_4  test_robustness.py
     run_step "CaseStudy_5 tests (EKF deriv. vs integral)"     CaseStudy_5  test_ekf.py
     run_step "CaseStudy_6 tests (comprehensive comparison)"   CaseStudy_6  test_comparison.py
+    run_step "CaseStudy_7 tests (ablation study)"              CaseStudy_7  test_ablation.py
+    run_step "CaseStudy_8 tests (non-Gaussian noise)"          CaseStudy_8  test_nongaussian.py
+    run_step "CaseStudy_9 tests (model mismatch)"              CaseStudy_9  test_mismatch.py
+    run_step "CaseStudy_10 tests (lambda sensitivity)"         CaseStudy_10 test_lambda.py
+    run_step "CaseStudy_11 tests (computational complexity)"   CaseStudy_11 test_complexity.py
 fi
 
 # ── Figuras ──────────────────────────────────────────────────
@@ -69,6 +74,11 @@ if [ "$MODE" = "all" ] || [ "$MODE" = "--figures" ]; then
     run_step "CaseStudy_4 figures (Table VI)"                    CaseStudy_4  generate_figures.py
     run_step "CaseStudy_5 figures (Fig 2f, Table VII)"           CaseStudy_5  generate_figures.py
     run_step "CaseStudy_6 figures (Fig 3, Table VIII)"           CaseStudy_6  generate_figures.py
+    run_step "CaseStudy_7 figures (Table 9 ablation)"            CaseStudy_7  generate_figures.py
+    run_step "CaseStudy_8 figures (Table 10 non-Gaussian)"       CaseStudy_8  generate_figures.py
+    run_step "CaseStudy_9 figures (Table 11 mismatch)"           CaseStudy_9  generate_figures.py
+    run_step "CaseStudy_10 figures (Fig 4 lambda sensitivity)"   CaseStudy_10 generate_figures.py
+    run_step "CaseStudy_11 figures (Table 12 complexity)"        CaseStudy_11 generate_figures.py
 fi
 
 # ── Resumen ──────────────────────────────────────────────────
