@@ -1,0 +1,5 @@
+Method,Gaussian_RMSE,Laplacian_RMSE,Impulsive_RMSE
+Diff 3pt,16.894,16.610,19.386
+EKF + Derivative,3.379,4.269,5.046
+EKF + Integral,1.570,1.902,1.927
+TII,0.102,0.111,0.132

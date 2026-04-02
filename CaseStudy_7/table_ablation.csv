@@ -1,0 +1,5 @@
+Configuration,RMSE_V,MAE_V,Correlation,Stable
+Differential only,22.339,17.663,0.1849,Yes
+Integral only,12.354,9.788,0.3242,Yes
+Integral + EKF,2.600,2.023,0.8746,Yes
+TII (full),0.229,0.182,0.9986,Yes

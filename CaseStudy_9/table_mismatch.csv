@@ -1,0 +1,4 @@
+Method,delta_0.0,delta_0.1,delta_0.2,delta_0.3
+EKF + Derivative,3.379,3.468,3.550,3.625
+EKF + Integral,1.570,1.543,1.528,1.526
+TII,0.102,0.137,0.211,0.296
